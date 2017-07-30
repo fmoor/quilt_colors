@@ -1,13 +1,11 @@
 # quilt_colors
-Randomize quilt block colors without letting adjacent blocks be the same color.
+Randomly assign colors to a quilt without letting any colors touch.
 
 # Example
 ```python
-from quilt_colors import Quilt
+from quilt_colors import color_quilt, new_quilt, print_quilt
 
-# each color in the color pallet reprisents a diferent color
-# width and heigh are the number of quilt blocks
-quilt = Quilt(width=15, height=21, color_pallet='rgbyp')
-quilt.choose_colors()
-print(quilt)
+colors = {'red', 'green', 'blue', 'yellow', 'mauve'}
+quilt = color_quilt(new_quilt(10, 15), colors)
+print_quilt(quilt)
 ```

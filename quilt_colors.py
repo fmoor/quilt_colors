@@ -1,82 +1,126 @@
-import random
-from itertools import product
-from typing import Iterable, Sequence
+from itertools import chain
+from random import shuffle, seed
+from typing import TypeVar, Tuple, Union, Any, Set, Iterable, Iterator
+
+seed()
+Color = TypeVar('Color')
 
 
-class Block:
-    """A quilt block."""
+def assign_color(color: Color,
+                 quilt: Tuple[Tuple[Union[Color, None], ...], ...],
+                 x: int,
+                 y: int) -> Tuple[Tuple[Union[Color, None], ...], ...]:
+    """
+    Create a new quilt with block (`x`, `y`) has the color `color`.
 
-    def __init__(self, color_pallet: Iterable[str]):
-        """:param color_pallet: The possible colors for this `Block`."""
-        self.color = None
-        self.color_pallet = set(color_pallet)
-
-        # the `Quilt` must set the neighbors attribute after instantiation
-        # because not all of the block's neighbors exist when it is instantiated.
-        self.neighbors = None
-
-    @property
-    def adjacent_colors(self) -> set:
-        """The colors of adjacent blocks."""
-        return {n.color for n in self.neighbors} - {None}
-
-    def choose_color(self):
-        """Choose a color for this block that none of it's neighbors have."""
-        self.color = random.choice(list(self.color_pallet - self.adjacent_colors))
+    :param color: The color to give the specified block.
+    :param quilt: The quilt to be colored.
+    :param x: The block's x position.
+    :param y: The block's y position.
+    :return: A new quilt with the newly colored block.
+    """
+    old_row = quilt[y]
+    new_row = old_row[:x] + (color,) + old_row[x+1:]
+    return quilt[:y] + (new_row,) + quilt[y+1:]
 
 
-class Quilt:
-    """A quilt that can color itself with a random pattern."""
-    _adjacency = [p for p in product((-1, 0, 1), (-1, 0, 1)) if p != (0, 0)]
+def neighbors(quilt: Tuple[Tuple[Any, ...], ...], x: int, y: int) -> Set[Any]:
+    """
+    Get the color of all neighbors.
 
-    def __init__(self, width: int, height: int, color_pallet: Sequence[str]):
-        """
-        :param width: the width of the quilt in `Blocks`.
-        :param height: the height of the quilt in `Blocks`.
-        :param color_pallet: A sequence of **single** character strings.
-            If the strings are longer than one character they will be truncated
-            when printing the `Quilt`.
-        """
-        if len(color_pallet) < 5:
-            # technically 4 colors is enough to choose colors that don't touch.
-            # However it requires a very regular pattern that doesn't look random.
-            raise ValueError('Not enough colors to choose from. '
-                             'Try adding colors to your pallet.')
+    .. note::
 
-        self.grid = [[Block(color_pallet) for _ in range(width)] for _ in range(height)]
-        for y, row in enumerate(self.grid):
-            for x, block in enumerate(row):
-                block.neighbors = tuple(self._iter_neighbors(x, y))
+        The color of block (`x`, `y`) is included in the colors returned.
 
-    def _iter_neighbors(self, x, y):
-        for i, j in self._adjacency:
-            try:
-                yield self.grid[y + j][x + i]
-            except IndexError:  # We tried to get a block that doesn't exits.
-                pass
+    :param quilt: The quilt containing (x, y)'s neighbors.
+    :param x: The block's x position.
+    :param y: The block's y position.
+    :return: The set of all neighboring colors.
+    """
+    left, up = max(x-1, 0), max(y-1, 0)  # negative indexes are not allowed
+    return set(chain(*(row[left:x+2] for row in quilt[up:y+2])))
 
-    def choose_colors(self):
-        """Find a new color pattern for the `Quilt`."""
-        for _ in range(10_000):
-            try:
-                for row in self.grid:
-                    for block in row:
-                        block.choose_color()
-                return
-            except IndexError:
-                # We ran into a dead end trying to choose unique colors
-                # quilts are not that big, just start over.
-                continue
 
-    def __str__(self):
-        # lay out the colors in a grid so you can see them
-        return '\n\n'.join(' '.join(b.color[:] for b in row) for row in self.grid)
+def next_empty(quilt: Tuple[Tuple[Any, ...], ...]) -> Union[Tuple[int, int], None]:
+    """
+    Get the position of the next empty block in the `quilt`.
 
-    def __repr__(self):
-        return (
-            f'{self.__class__.__name__}('
-            f'width={len(self.grid[0])}, '
-            f'height={len(self.grid)}, '
-            f'color_pallet={list(self.grid[0][0].color_pallet)}'
-            f')'
-        )
+    Empty blocks are populated with None.
+
+    :param quilt: The quilt to be searched for empty blocks.
+    :return: The position of the next empty block i.e. (x, y)
+             or None if there are no empty blocks.
+    """
+    for y, row in enumerate(quilt):
+        try:
+            return row.index(None), y
+        except ValueError:
+            continue
+    return None  # there were no empty blocks
+
+
+def random_order(values: Iterable[Any]) -> Iterator[Any]:
+    """
+    Get an iterator that yields items from `values` in a random order.
+
+    :param values: A collection of values.
+    :return: A randomly ordered iterator.
+    """
+    list_ = list(values)
+    shuffle(list_)
+    return iter(list_)
+
+
+def color_quilt(quilt: Tuple[Tuple[Union[Color, None], ...], ...],
+                colors: Set[Color]) -> Union[Tuple[Tuple[Color, ...], ...], None]:
+    """
+    Randomly assign colors to a `quilt` without letting any colors touch.
+
+    :param quilt: The empty quilt to be colored.
+    :param colors: The set of colors to choose from.
+    :return: A randomly colored quilt or None if there is no solution.
+    """
+    block = next_empty(quilt)
+    if block is None:
+        return quilt  # No more empty blocks. => The quilt is fully colored!
+    valid_colors = colors - neighbors(quilt, *block)
+    for color in random_order(valid_colors):
+        child_quilt = assign_color(color, quilt, *block)
+        finished_quilt = color_quilt(child_quilt, colors)
+        if finished_quilt is not None:
+            return finished_quilt  # We found a solution!
+    return None  # There is no solution in this branch.
+
+
+def print_quilt(quilt: Tuple[Tuple[Any, ...], ...]) -> None:
+    """
+    Print a quilt with fixed width columns.
+
+    :param quilt: The quilt to be printed.
+    """
+    width = max(len(str(c)) for c in chain(*quilt))
+    spec = f'{{:^{width}}}'
+    print()
+    for row in quilt:
+        formatted = (spec.format(c) for c in row)
+        print(' '.join(formatted), end='\n\n')
+
+
+def new_quilt(width: int, height: int) -> Tuple[Tuple[None, ...], ...]:
+    """
+    Create a new empty quilt.
+
+    :param width: The quilt width in blocks.
+    :param height: The quilt height in blocks.
+    :return: An empty quilt.
+    """
+    return tuple(tuple(None for _ in range(width)) for _ in range(height))
+
+
+if __name__ == '__main__':
+    quilt = new_quilt(10, 15)
+    answer = color_quilt(quilt, {'red', 'green', 'blue', 'yellow', 'mauve'})
+    if answer is None:
+        print(None)
+    else:
+        print_quilt(answer)

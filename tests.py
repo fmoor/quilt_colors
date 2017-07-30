@@ -1,35 +1,75 @@
-from pytest import fixture
-
-from quilt_colors import Block
+from quilt_colors import next_empty, assign_color, neighbors
 
 
-@fixture
-def color_pallet():
-    return 'rgbyc'
+def test_next_empty_first():
+    quilt = ((None, 1, 1),
+             (None, 1, 1),
+             (None, 1, 1),)
+    assert next_empty(quilt) == (0, 0)
 
 
-@fixture
-def neighbor(color_pallet):
-    return Block(color_pallet)
+def test_next_empty_last():
+    quilt = ((1, 1, 1),
+             (1, 1, 1),
+             (1, 1, None),)
+    assert next_empty(quilt) == (2, 2)
 
 
-@fixture
-def block(color_pallet, neighbor):
-    block = Block(color_pallet)
-    block.neighbors = [neighbor]
-    return block
+def test_next_empty_side():
+    quilt = ((1, 1, 1),
+             (1, 1, None),
+             (1, 1, 1),)
+    assert next_empty(quilt) == (2, 1)
 
 
-def test_block_finds_adjacent_colors(block, neighbor):
-    neighbor.color = 'r'
-    assert block.adjacent_colors == {'r'}
+def test_next_empty_middle():
+    quilt = ((1, 1, 1),
+             (1, None, 1),
+             (1, 1, 1),)
+    assert next_empty(quilt) == (1, 1)
 
 
-def test_block_adjacent_colors_doesnt_contain_none(block):
-    assert block.adjacent_colors == set()
+def test_assign_color_top_left():
+    quilt = ((0, 0, 0, 0),
+             (0, 0, 0, 0),
+             (0, 0, 0, 0),
+             (0, 0, 0, 0),)
+    assert assign_color(1, quilt, 0, 0) == ((1, 0, 0, 0),
+                                            (0, 0, 0, 0),
+                                            (0, 0, 0, 0),
+                                            (0, 0, 0, 0),)
 
 
-def test_block_chooses_color_from_color_pallet(block, color_pallet):
-    assert block.color is None
-    block.choose_color()
-    assert block.color in color_pallet
+def test_assign_color_bottom_right():
+    quilt = ((0, 0, 0, 0),
+             (0, 0, 0, 0),
+             (0, 0, 0, 0),
+             (0, 0, 0, 0),)
+    assert assign_color(1, quilt, 3, 3) == ((0, 0, 0, 0),
+                                            (0, 0, 0, 0),
+                                            (0, 0, 0, 0),
+                                            (0, 0, 0, 1),)
+
+
+def test_neighbors():
+    quilt = ((1, 2, 3, 0),
+             (8, 9, 4, 0),
+             (7, 6, 5, 0),
+             (0, 0, 0, 0),)
+    assert neighbors(quilt, 1, 1) == {1, 2, 3, 4, 5, 6, 7, 8, 9}
+
+
+def test_neighbors_top_left():
+    quilt = ((1, 2, 3, 0),
+             (8, 9, 4, 0),
+             (7, 6, 5, 0),
+             (0, 0, 0, 0),)
+    assert neighbors(quilt, 0, 0) == {1, 2, 8, 9}
+
+
+def test_neighbors_bottom_right():
+    quilt = ((0, 0, 0, 0),
+             (0, 0, 0, 0),
+             (0, 0, 5, 2),
+             (0, 0, 6, 1),)
+    assert neighbors(quilt, 3, 3) == {1, 2, 5, 6}
